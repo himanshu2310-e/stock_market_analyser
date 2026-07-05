@@ -1,0 +1,26 @@
+# Set the default behavior to handle all files as text and automatically normalize line endings on commit (LF)
+* text=auto
+
+# Explicitly declare text files to always be normalized
+*.html text
+*.css text
+*.js text
+*.jsx text
+*.json text
+*.md text
+*.yml text
+*.yaml text
+*.xml text
+
+# Set binary files to prevent Git from modifying their line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
