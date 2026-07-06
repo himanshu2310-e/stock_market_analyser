@@ -2,9 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
