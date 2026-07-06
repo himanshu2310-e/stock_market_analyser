@@ -1,0 +1,13 @@
+{
+  "name": "stock-market-analyzer",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Stock Market Analyzer — monorepo root",
+  "scripts": {
+    "postinstall": "cd backend && npm install",
+    "start": "node backend/server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
