@@ -32,9 +32,21 @@ initDataDir().then(() => {
 
 /* ---------- Global Middleware ---------- */
 app.use(helmet());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://stock-market-analyser-45py-bdax5k2ne-himanshu2310-es-projects.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
