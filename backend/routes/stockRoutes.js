@@ -21,10 +21,14 @@ const optionalAuth = async (req, _res, next) => {
       req.headers.authorization.startsWith('Bearer')
     ) {
       const jwt = require('jsonwebtoken');
-      const User = require('../models/User');
+      const store = require('../utils/jsonStore');
       const token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select('-password');
+      const user = await store.findById('users.json', decoded.id);
+      if (user) {
+        const { password, ...safeUser } = user;
+        req.user = safeUser;
+      }
     }
   } catch {
     /* Silently ignore — user just won't be attached */

@@ -1,4 +1,6 @@
-const Watchlist = require('../models/Watchlist');
+const store = require('../utils/jsonStore');
+
+const WATCHLIST_FILE = 'watchlist.json';
 
 /**
  * @route   GET /api/watchlist
@@ -6,9 +8,11 @@ const Watchlist = require('../models/Watchlist');
  */
 const getWatchlist = async (req, res, next) => {
   try {
-    const items = await Watchlist.find({ userId: req.user._id }).sort({
-      pinned: -1,
-      createdAt: -1,
+    const items = await store.findAll(WATCHLIST_FILE, { userId: req.user.id });
+    /* Sort: pinned first, then newest first */
+    items.sort((a, b) => {
+      if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
     });
     res.status(200).json({ success: true, data: items });
   } catch (error) {
@@ -30,9 +34,10 @@ const addToWatchlist = async (req, res, next) => {
         .json({ success: false, message: 'Symbol is required' });
     }
 
-    const existing = await Watchlist.findOne({
-      userId: req.user._id,
-      symbol: symbol.toUpperCase(),
+    /* Check for duplicate (userId + symbol) */
+    const existing = await store.findOne(WATCHLIST_FILE, {
+      userId: req.user.id,
+      symbol: symbol.toUpperCase().trim(),
     });
     if (existing) {
       return res
@@ -40,10 +45,11 @@ const addToWatchlist = async (req, res, next) => {
         .json({ success: false, message: 'Stock already in watchlist' });
     }
 
-    const item = await Watchlist.create({
-      userId: req.user._id,
-      symbol: symbol.toUpperCase(),
+    const item = await store.create(WATCHLIST_FILE, {
+      userId: req.user.id,
+      symbol: symbol.toUpperCase().trim(),
       companyName: companyName || symbol,
+      pinned: false,
     });
 
     res.status(201).json({
@@ -62,19 +68,20 @@ const addToWatchlist = async (req, res, next) => {
  */
 const togglePin = async (req, res, next) => {
   try {
-    const item = await Watchlist.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
+    const existing = await store.findOne(WATCHLIST_FILE, {
+      id: req.params.id,
+      userId: req.user.id,
     });
 
-    if (!item) {
+    if (!existing) {
       return res
         .status(404)
         .json({ success: false, message: 'Watchlist item not found' });
     }
 
-    item.pinned = !item.pinned;
-    await item.save();
+    const item = await store.updateById(WATCHLIST_FILE, req.params.id, {
+      pinned: !existing.pinned,
+    });
 
     res.status(200).json({
       success: true,
@@ -92,16 +99,18 @@ const togglePin = async (req, res, next) => {
  */
 const removeFromWatchlist = async (req, res, next) => {
   try {
-    const item = await Watchlist.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id,
+    const existing = await store.findOne(WATCHLIST_FILE, {
+      id: req.params.id,
+      userId: req.user.id,
     });
 
-    if (!item) {
+    if (!existing) {
       return res
         .status(404)
         .json({ success: false, message: 'Watchlist item not found' });
     }
+
+    await store.deleteById(WATCHLIST_FILE, req.params.id);
 
     res
       .status(200)

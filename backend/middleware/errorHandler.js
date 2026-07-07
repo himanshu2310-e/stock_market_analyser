@@ -8,30 +8,25 @@ const errorHandler = (err, _req, res, _next) => {
     console.error(err.stack);
   }
 
-  /* Mongoose bad ObjectId */
-  if (err.name === 'CastError') {
-    return res.status(400).json({
+  /* JSON file read/write errors */
+  if (err.code === 'ENOENT') {
+    return res.status(500).json({
       success: false,
-      message: 'Invalid resource ID format',
+      message: 'Data file not found — it will be created on next request',
     });
   }
 
-  /* Mongoose duplicate key */
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
-    return res.status(409).json({
+  if (err.code === 'EACCES' || err.code === 'EPERM') {
+    return res.status(500).json({
       success: false,
-      message: `Duplicate value for "${field}". This ${field} already exists.`,
+      message: 'File permission error — cannot read/write data',
     });
   }
 
-  /* Mongoose validation error */
-  if (err.name === 'ValidationError') {
-    const messages = Object.values(err.errors).map((e) => e.message);
-    return res.status(400).json({
+  if (err instanceof SyntaxError && err.message.includes('JSON')) {
+    return res.status(500).json({
       success: false,
-      message: 'Validation Error',
-      errors: messages,
+      message: 'Data file contains invalid JSON',
     });
   }
 

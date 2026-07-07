@@ -1,5 +1,54 @@
 const AlphaVantageService = require('../utils/alphaVantage');
-const RecentSearch = require('../models/RecentSearch');
+const store = require('../utils/jsonStore');
+
+const RECENT_SEARCHES_FILE = 'recentSearches.json';
+
+/**
+ * Save a recent search for the user.
+ * Upserts by (userId, symbol) and trims to 20 entries per user.
+ */
+const addRecentSearch = async (userId, symbol, companyName) => {
+  try {
+    const all = await store.readJSON(RECENT_SEARCHES_FILE);
+    const existingIndex = all.findIndex(
+      (r) => r.userId === userId && r.symbol === symbol
+    );
+
+    const now = new Date().toISOString();
+
+    if (existingIndex !== -1) {
+      /* Update existing entry's timestamp and companyName */
+      all[existingIndex].companyName = companyName || all[existingIndex].companyName;
+      all[existingIndex].updatedAt = now;
+    } else {
+      /* Create new entry */
+      const { v4: uuidv4 } = require('uuid');
+      all.push({
+        id: uuidv4(),
+        userId,
+        symbol,
+        companyName: companyName || '',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    /* Keep only the latest 20 per user */
+    const userEntries = all
+      .filter((r) => r.userId === userId)
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    const idsToKeep = new Set(userEntries.slice(0, 20).map((r) => r.id));
+    const trimmed = all.filter(
+      (r) => r.userId !== userId || idsToKeep.has(r.id)
+    );
+
+    await store.writeJSON(RECENT_SEARCHES_FILE, trimmed);
+  } catch (err) {
+    /* Silently ignore — don't break the main request */
+    console.error('Recent search save error:', err.message);
+  }
+};
 
 /**
  * @route   GET /api/stocks/search?q=AAPL
@@ -102,9 +151,7 @@ const getStock = async (req, res, next) => {
 
     /* Save recent search if user is authenticated */
     if (req.user) {
-      RecentSearch.addSearch(req.user._id, symbol, overview.name).catch(
-        () => {}
-      );
+      addRecentSearch(req.user.id, symbol, overview.name);
     }
 
     res.status(200).json({

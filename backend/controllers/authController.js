@@ -1,8 +1,11 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const { body } = require('express-validator');
-const User = require('../models/User');
+const store = require('../utils/jsonStore');
 const { generateToken } = require('../utils/tokenUtils');
 const { sendPasswordResetEmail } = require('../utils/emailService');
+
+const USERS_FILE = 'users.json';
 
 /* ---------- Validation rules ---------- */
 const signupRules = [
@@ -34,7 +37,8 @@ const signup = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
-    const existingUser = await User.findOne({ email });
+    /* Check for duplicate email */
+    const existingUser = await store.findOne(USERS_FILE, { email: email.toLowerCase() });
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -42,16 +46,25 @@ const signup = async (req, res, next) => {
       });
     }
 
-    const user = await User.create({ name, email, password });
+    /* Hash password */
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    const token = generateToken(user._id);
+    const user = await store.create(USERS_FILE, {
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      avatar: '',
+    });
+
+    const token = generateToken(user.id);
 
     res.status(201).json({
       success: true,
       message: 'Account created successfully',
       data: {
         user: {
-          _id: user._id,
+          _id: user.id,
           name: user.name,
           email: user.email,
           avatar: user.avatar,
@@ -73,28 +86,28 @@ const login = async (req, res, next) => {
   try {
     const { email, password, rememberMe } = req.body;
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await store.findOne(USERS_FILE, { email: email.toLowerCase() });
     if (!user) {
       return res
         .status(401)
         .json({ success: false, message: 'Invalid email or password' });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res
         .status(401)
         .json({ success: false, message: 'Invalid email or password' });
     }
 
-    const token = generateToken(user._id, rememberMe);
+    const token = generateToken(user.id, rememberMe);
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
         user: {
-          _id: user._id,
+          _id: user.id,
           name: user.name,
           email: user.email,
           avatar: user.avatar,
@@ -127,7 +140,7 @@ const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await store.findOne(USERS_FILE, { email: email.toLowerCase() });
     if (!user) {
       /* Don't reveal whether the email exists */
       return res.status(200).json({
@@ -136,15 +149,25 @@ const forgotPassword = async (req, res, next) => {
       });
     }
 
-    const resetToken = user.createPasswordResetToken();
-    await user.save({ validateBeforeSave: false });
+    /* Generate reset token */
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    await store.updateById(USERS_FILE, user.id, {
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: Date.now() + 60 * 60 * 1000, // 1 hour
+    });
 
     try {
       await sendPasswordResetEmail(user.email, resetToken);
     } catch (emailError) {
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpires = undefined;
-      await user.save({ validateBeforeSave: false });
+      await store.updateById(USERS_FILE, user.id, {
+        resetPasswordToken: undefined,
+        resetPasswordExpires: undefined,
+      });
       console.error('Email send failed:', emailError);
       return res.status(500).json({
         success: false,
@@ -172,10 +195,14 @@ const resetPassword = async (req, res, next) => {
       .update(req.params.token)
       .digest('hex');
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
+    /* Find user with valid reset token */
+    const users = await store.readJSON(USERS_FILE);
+    const user = users.find(
+      (u) =>
+        u.resetPasswordToken === hashedToken &&
+        u.resetPasswordExpires &&
+        u.resetPasswordExpires > Date.now()
+    );
 
     if (!user) {
       return res.status(400).json({
@@ -184,12 +211,17 @@ const resetPassword = async (req, res, next) => {
       });
     }
 
-    user.password = req.body.password;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-    await user.save();
+    /* Hash new password and clear reset fields */
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
-    const token = generateToken(user._id);
+    await store.updateById(USERS_FILE, user.id, {
+      password: hashedPassword,
+      resetPasswordToken: undefined,
+      resetPasswordExpires: undefined,
+    });
+
+    const token = generateToken(user.id);
 
     res.status(200).json({
       success: true,

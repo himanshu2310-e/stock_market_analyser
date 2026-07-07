@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-const connectDB = require('./config/db');
+const { initDataDir } = require('./utils/jsonStore');
 const errorHandler = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
@@ -18,10 +18,17 @@ const watchlistRoutes = require('./routes/watchlistRoutes');
 const portfolioRoutes = require('./routes/portfolioRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const marketRoutes = require('./routes/marketRoutes');
+const alertRoutes = require('./routes/alertRoutes');
+const historyRoutes = require('./routes/historyRoutes');
 
 const app = express();
 
-connectDB();
+/* ---------- Initialize JSON data directory ---------- */
+initDataDir().then(() => {
+  console.log('✅ JSON data store initialized');
+}).catch((err) => {
+  console.error('❌ Failed to initialize data store:', err.message);
+});
 
 /* ---------- Global Middleware ---------- */
 app.use(helmet());
@@ -46,6 +53,8 @@ app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/market', marketRoutes);
+app.use('/api/alerts', alertRoutes);
+app.use('/api/history', historyRoutes);
 
 /* ---------- Health Check ---------- */
 app.get('/api/health', (_req, res) => {

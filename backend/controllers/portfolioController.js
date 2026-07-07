@@ -1,4 +1,6 @@
-const Portfolio = require('../models/Portfolio');
+const store = require('../utils/jsonStore');
+
+const PORTFOLIO_FILE = 'portfolio.json';
 
 /**
  * @route   GET /api/portfolio
@@ -6,9 +8,9 @@ const Portfolio = require('../models/Portfolio');
  */
 const getPortfolio = async (req, res, next) => {
   try {
-    const items = await Portfolio.find({ userId: req.user._id }).sort({
-      createdAt: -1,
-    });
+    const items = await store.findAll(PORTFOLIO_FILE, { userId: req.user.id });
+    /* Sort newest first */
+    items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     res.status(200).json({ success: true, data: items });
   } catch (error) {
     next(error);
@@ -31,12 +33,12 @@ const addInvestment = async (req, res, next) => {
       });
     }
 
-    const item = await Portfolio.create({
-      userId: req.user._id,
-      symbol: symbol.toUpperCase(),
+    const item = await store.create(PORTFOLIO_FILE, {
+      userId: req.user.id,
+      symbol: symbol.toUpperCase().trim(),
       companyName: companyName || symbol,
-      quantity,
-      purchasePrice,
+      quantity: parseFloat(quantity),
+      purchasePrice: parseFloat(purchasePrice),
       purchaseDate,
       notes: notes || '',
     });
@@ -59,23 +61,25 @@ const updateInvestment = async (req, res, next) => {
   try {
     const { quantity, purchasePrice, purchaseDate, notes } = req.body;
 
-    const item = await Portfolio.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
+    /* Verify ownership */
+    const existing = await store.findOne(PORTFOLIO_FILE, {
+      id: req.params.id,
+      userId: req.user.id,
     });
 
-    if (!item) {
+    if (!existing) {
       return res
         .status(404)
         .json({ success: false, message: 'Investment not found' });
     }
 
-    if (quantity !== undefined) item.quantity = quantity;
-    if (purchasePrice !== undefined) item.purchasePrice = purchasePrice;
-    if (purchaseDate !== undefined) item.purchaseDate = purchaseDate;
-    if (notes !== undefined) item.notes = notes;
+    const updates = {};
+    if (quantity !== undefined) updates.quantity = parseFloat(quantity);
+    if (purchasePrice !== undefined) updates.purchasePrice = parseFloat(purchasePrice);
+    if (purchaseDate !== undefined) updates.purchaseDate = purchaseDate;
+    if (notes !== undefined) updates.notes = notes;
 
-    await item.save();
+    const item = await store.updateById(PORTFOLIO_FILE, req.params.id, updates);
 
     res.status(200).json({
       success: true,
@@ -93,16 +97,19 @@ const updateInvestment = async (req, res, next) => {
  */
 const deleteInvestment = async (req, res, next) => {
   try {
-    const item = await Portfolio.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id,
+    /* Verify ownership */
+    const existing = await store.findOne(PORTFOLIO_FILE, {
+      id: req.params.id,
+      userId: req.user.id,
     });
 
-    if (!item) {
+    if (!existing) {
       return res
         .status(404)
         .json({ success: false, message: 'Investment not found' });
     }
+
+    await store.deleteById(PORTFOLIO_FILE, req.params.id);
 
     res.status(200).json({ success: true, message: 'Investment deleted' });
   } catch (error) {

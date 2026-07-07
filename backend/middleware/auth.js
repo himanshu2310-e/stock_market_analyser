@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const store = require('../utils/jsonStore');
+
+const USERS_FILE = 'users.json';
 
 /**
  * Protect routes — verifies Bearer JWT and attaches req.user.
@@ -23,14 +25,16 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await store.findById(USERS_FILE, decoded.id);
     if (!user) {
       return res
         .status(401)
         .json({ success: false, message: 'User no longer exists' });
     }
 
-    req.user = user;
+    /* Attach user without password */
+    const { password, ...safeUser } = user;
+    req.user = safeUser;
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

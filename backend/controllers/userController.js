@@ -1,5 +1,8 @@
+const bcrypt = require('bcryptjs');
 const { body } = require('express-validator');
-const User = require('../models/User');
+const store = require('../utils/jsonStore');
+
+const USERS_FILE = 'users.json';
 
 /* ---------- Validation ---------- */
 const updateProfileRules = [
@@ -31,11 +34,14 @@ const changePasswordRules = [
  */
 const getProfile = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await store.findById(USERS_FILE, req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
     res.status(200).json({
       success: true,
       data: {
-        _id: user._id,
+        _id: user.id,
         name: user.name,
         email: user.email,
         avatar: user.avatar,
@@ -55,20 +61,30 @@ const updateProfile = async (req, res, next) => {
   try {
     const { name, email, avatar } = req.body;
     const updates = {};
-    if (name) updates.name = name;
-    if (email) updates.email = email;
+    if (name) updates.name = name.trim();
+    if (email) {
+      /* Check that new email isn't already taken by another user */
+      const existing = await store.findOne(USERS_FILE, { email: email.toLowerCase() });
+      if (existing && existing.id !== req.user.id) {
+        return res.status(409).json({
+          success: false,
+          message: 'This email is already in use',
+        });
+      }
+      updates.email = email.toLowerCase().trim();
+    }
     if (avatar !== undefined) updates.avatar = avatar;
 
-    const user = await User.findByIdAndUpdate(req.user._id, updates, {
-      new: true,
-      runValidators: true,
-    });
+    const user = await store.updateById(USERS_FILE, req.user.id, updates);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     res.status(200).json({
       success: true,
       message: 'Profile updated',
       data: {
-        _id: user._id,
+        _id: user.id,
         name: user.name,
         email: user.email,
         avatar: user.avatar,
@@ -88,17 +104,22 @@ const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    const user = await User.findById(req.user._id).select('+password');
-    const isMatch = await user.comparePassword(currentPassword);
+    const user = await store.findById(USERS_FILE, req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res
         .status(401)
         .json({ success: false, message: 'Current password is incorrect' });
     }
 
-    user.password = newPassword;
-    await user.save();
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await store.updateById(USERS_FILE, req.user.id, { password: hashedPassword });
 
     res.status(200).json({
       success: true,
@@ -111,20 +132,22 @@ const changePassword = async (req, res, next) => {
 
 /**
  * @route   DELETE /api/user/profile
- * @desc    Delete user account
+ * @desc    Delete user account and all related data
  */
 const deleteProfile = async (req, res, next) => {
   try {
-    await User.findByIdAndDelete(req.user._id);
+    const userId = req.user.id;
 
-    /* Clean up related data */
-    const mongoose = require('mongoose');
-    const userId = req.user._id;
+    await store.deleteById(USERS_FILE, userId);
+
+    /* Clean up all related data */
     await Promise.all([
-      mongoose.model('Watchlist').deleteMany({ userId }),
-      mongoose.model('Portfolio').deleteMany({ userId }),
-      mongoose.model('RecentSearch').deleteMany({ userId }),
-      mongoose.model('Favorite').deleteMany({ userId }),
+      store.deleteMany('watchlist.json', { userId }),
+      store.deleteMany('portfolio.json', { userId }),
+      store.deleteMany('recentSearches.json', { userId }),
+      store.deleteMany('favorites.json', { userId }),
+      store.deleteMany('alerts.json', { userId }),
+      store.deleteMany('history.json', { userId }),
     ]);
 
     res.status(200).json({

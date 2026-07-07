@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 
 /**
  * Generate a signed JWT.
- * @param {string} id - User's MongoDB _id
+ * @param {string} id - User's UUID
  * @param {boolean} rememberMe - If true, extends expiry to 30 days
  * @returns {string} Signed JWT
  */
