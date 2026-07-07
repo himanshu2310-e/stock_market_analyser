@@ -25,7 +25,7 @@ export default function StockDetailPage() {
   const isInWatchlist = watchlist.some((w) => w.symbol === symbol?.toUpperCase());
 
   /* Fetch stock data */
-  const { data: stockData, isLoading, isError, refetch } = useQuery({
+  const { data: stockData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['stock', symbol],
     queryFn: async () => {
       const { data } = await stockService.getStock(symbol);
@@ -86,9 +86,10 @@ export default function StockDetailPage() {
   if (isLoading) return <LoadingSkeleton type="card" count={3} />;
 
   if (isError) {
+    const errorMsg = error?.response?.data?.message || error?.message || "Failed to load stock data";
     return (
       <div className="glass-card p-12 text-center">
-        <p className="text-danger-400 text-lg mb-4">Failed to load stock data</p>
+        <p className="text-danger-400 text-lg mb-4">{errorMsg}</p>
         <button onClick={refetch} className="btn-primary inline-flex items-center gap-2">
           <HiOutlineRefresh className="w-4 h-4" /> Retry
         </button>

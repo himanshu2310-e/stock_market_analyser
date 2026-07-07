@@ -95,7 +95,7 @@ const getStock = async (req, res, next) => {
       AlphaVantageService.getOverview(symbol),
     ]);
 
-    const gq = quoteData['Global Quote'] || {};
+    const gq = quoteData?.['Global Quote'] || {};
 
     const quote = {
       symbol: gq['01. symbol'] || symbol,
@@ -111,42 +111,42 @@ const getStock = async (req, res, next) => {
     };
 
     const overview = {
-      name: overviewData.Name || '',
-      description: overviewData.Description || '',
-      exchange: overviewData.Exchange || '',
-      currency: overviewData.Currency || '',
-      country: overviewData.Country || '',
-      sector: overviewData.Sector || '',
-      industry: overviewData.Industry || '',
-      marketCap: overviewData.MarketCapitalization || '',
-      peRatio: overviewData.PERatio || '',
-      pegRatio: overviewData.PEGRatio || '',
-      bookValue: overviewData.BookValue || '',
-      dividendPerShare: overviewData.DividendPerShare || '',
-      dividendYield: overviewData.DividendYield || '',
-      eps: overviewData.EPS || '',
-      revenuePerShare: overviewData.RevenuePerShareTTM || '',
-      profitMargin: overviewData.ProfitMargin || '',
-      operatingMargin: overviewData.OperatingMarginTTM || '',
-      returnOnAssets: overviewData.ReturnOnAssetsTTM || '',
-      returnOnEquity: overviewData.ReturnOnEquityTTM || '',
-      revenue: overviewData.RevenueTTM || '',
-      grossProfit: overviewData.GrossProfitTTM || '',
-      dilutedEPS: overviewData.DilutedEPSTTM || '',
-      quarterlyEarningsGrowth: overviewData.QuarterlyEarningsGrowthYOY || '',
-      quarterlyRevenueGrowth: overviewData.QuarterlyRevenueGrowthYOY || '',
-      analystTargetPrice: overviewData.AnalystTargetPrice || '',
-      analystRatingBuy: overviewData.AnalystRatingStrongBuy || '',
-      analystRatingHold: overviewData.AnalystRatingHold || '',
-      analystRatingSell: overviewData.AnalystRatingSell || '',
-      week52High: overviewData['52WeekHigh'] || '',
-      week52Low: overviewData['52WeekLow'] || '',
-      day50MA: overviewData['50DayMovingAverage'] || '',
-      day200MA: overviewData['200DayMovingAverage'] || '',
-      sharesOutstanding: overviewData.SharesOutstanding || '',
-      beta: overviewData.Beta || '',
-      forwardPE: overviewData.ForwardPE || '',
-      address: overviewData.Address || '',
+      name: overviewData?.Name || '',
+      description: overviewData?.Description || '',
+      exchange: overviewData?.Exchange || '',
+      currency: overviewData?.Currency || '',
+      country: overviewData?.Country || '',
+      sector: overviewData?.Sector || '',
+      industry: overviewData?.Industry || '',
+      marketCap: overviewData?.MarketCapitalization || '',
+      peRatio: overviewData?.PERatio || '',
+      pegRatio: overviewData?.PEGRatio || '',
+      bookValue: overviewData?.BookValue || '',
+      dividendPerShare: overviewData?.DividendPerShare || '',
+      dividendYield: overviewData?.DividendYield || '',
+      eps: overviewData?.EPS || '',
+      revenuePerShare: overviewData?.RevenuePerShareTTM || '',
+      profitMargin: overviewData?.ProfitMargin || '',
+      operatingMargin: overviewData?.OperatingMarginTTM || '',
+      returnOnAssets: overviewData?.ReturnOnAssetsTTM || '',
+      returnOnEquity: overviewData?.ReturnOnEquityTTM || '',
+      revenue: overviewData?.RevenueTTM || '',
+      grossProfit: overviewData?.GrossProfitTTM || '',
+      dilutedEPS: overviewData?.DilutedEPSTTM || '',
+      quarterlyEarningsGrowth: overviewData?.QuarterlyEarningsGrowthYOY || '',
+      quarterlyRevenueGrowth: overviewData?.QuarterlyRevenueGrowthYOY || '',
+      analystTargetPrice: overviewData?.AnalystTargetPrice || '',
+      analystRatingBuy: overviewData?.AnalystRatingStrongBuy || '',
+      analystRatingHold: overviewData?.AnalystRatingHold || '',
+      analystRatingSell: overviewData?.AnalystRatingSell || '',
+      week52High: overviewData?.['52WeekHigh'] || '',
+      week52Low: overviewData?.['52WeekLow'] || '',
+      day50MA: overviewData?.['50DayMovingAverage'] || '',
+      day200MA: overviewData?.['200DayMovingAverage'] || '',
+      sharesOutstanding: overviewData?.SharesOutstanding || '',
+      beta: overviewData?.Beta || '',
+      forwardPE: overviewData?.ForwardPE || '',
+      address: overviewData?.Address || '',
     };
 
     /* Save recent search if user is authenticated */
@@ -190,11 +190,11 @@ const getHistorical = async (req, res, next) => {
     let entries = Object.entries(timeSeries)
       .map(([date, values]) => ({
         date,
-        open: parseFloat(values['1. open']),
-        high: parseFloat(values['2. high']),
-        low: parseFloat(values['3. low']),
-        close: parseFloat(values['4. close']),
-        volume: parseInt(values['5. volume'], 10),
+        open: parseFloat(values?.['1. open']) || 0,
+        high: parseFloat(values?.['2. high']) || 0,
+        low: parseFloat(values?.['3. low']) || 0,
+        close: parseFloat(values?.['4. close']) || 0,
+        volume: parseInt(values?.['5. volume'], 10) || 0,
       }))
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -247,15 +247,15 @@ const getIndicators = async (req, res, next) => {
     const { symbol } = req.params;
 
     const rawData = await AlphaVantageService.getDaily(symbol, 'full');
-    const timeSeries = rawData['Time Series (Daily)'] || {};
+    const timeSeries = rawData?.['Time Series (Daily)'] || {};
 
     const entries = Object.entries(timeSeries)
       .map(([date, v]) => ({
         date,
-        close: parseFloat(v['4. close']),
-        high: parseFloat(v['2. high']),
-        low: parseFloat(v['3. low']),
-        volume: parseInt(v['5. volume'], 10),
+        close: parseFloat(v?.['4. close']) || 0,
+        high: parseFloat(v?.['2. high']) || 0,
+        low: parseFloat(v?.['3. low']) || 0,
+        volume: parseInt(v?.['5. volume'], 10) || 0,
       }))
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 

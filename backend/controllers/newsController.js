@@ -9,7 +9,7 @@ const getNews = async (req, res, next) => {
     const { tickers = '', topics = '' } = req.query;
     const data = await AlphaVantageService.getNewsSentiment(tickers, topics);
 
-    const articles = (data.feed || []).map((article) => ({
+    const articles = (data?.feed || []).map((article) => ({
       title: article.title || '',
       url: article.url || '',
       summary: article.summary || '',
